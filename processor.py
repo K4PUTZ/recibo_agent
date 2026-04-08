@@ -9,7 +9,22 @@ import unicodedata
 from pathlib import Path
 from datetime import datetime
 
+
 from config import MESES, CONTAS, CONTA_PISTAS, ALUNOS_CONHECIDOS, PAGADORES_MAP
+
+# Suporte a leitura de DOCX
+def _read_docx_text(docx_path: Path) -> str:
+    try:
+        from docx import Document
+    except ImportError:
+        print("  ⚠ python-docx não instalado. Use: pip install python-docx")
+        return ""
+    try:
+        doc = Document(str(docx_path))
+        return "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
+    except Exception as e:
+        print(f"  ⚠ Erro ao ler DOCX: {e}")
+        return ""
 
 _ocr_reader = None
 
@@ -57,24 +72,51 @@ def process_receipt(file_path: Path) -> dict | None:
             _shutil.copy2(str(file_path), str(tmp))
             image_path = tmp
             temp_image = tmp
+            reader = _get_reader()
+            results = reader.readtext(str(image_path), detail=0)
+            text = "\n".join(results)
+            if not text.strip():
+                print("  ⚠ OCR não extraiu texto")
+                return None
+            print(f"  OCR extraiu {len(results)} linhas")
+            return _parse(text)
         elif suffix == ".pdf":
             image_path = _pdf_first_page_to_image(file_path)
             temp_image = image_path
+            reader = _get_reader()
+            results = reader.readtext(str(image_path), detail=0)
+            text = "\n".join(results)
+            if not text.strip():
+                print("  ⚠ OCR não extraiu texto")
+                return None
+            print(f"  OCR extraiu {len(results)} linhas")
+            return _parse(text)
+        elif suffix == ".docx":
+            text = _read_docx_text(file_path)
+            if not text.strip():
+                print("  ⚠ DOCX vazio ou ilegível")
+                return None
+            print(f"  DOCX lido com {len(text.splitlines())} linhas")
+            # Preencher campos básicos, marcar como OK (DOCX)
+            # Tenta extrair valor e data, mas não força
+            valor = _extract_valor(text)
+            data = _extract_data(text)
+            obs = f"Recibo DOCX manual: {text.splitlines()[0][:60]}" if text else "Recibo DOCX manual"
+            return {
+                "AlunoBeneficiario": "",
+                "DataPagamento": data.strftime("%Y-%m-%d") if data else None,
+                "VALOR": valor,
+                "Competencia": MESES[data.month - 1] if data else None,
+                "Recibo": "OK (DOCX)",
+                "ContaRecebimento": _extract_conta(text),
+                "StatusPagamento": "Confirmado",
+                "PagadorNome(Opcional)": "",
+                "ObservacoesPagamento": obs,
+                "_tx_id": _extract_tx_id(text),
+            }
         else:
             print(f"  ⚠ Formato não suportado: {suffix}")
             return None
-
-        reader = _get_reader()
-        results = reader.readtext(str(image_path), detail=0)
-        text = "\n".join(results)
-
-        if not text.strip():
-            print("  ⚠ OCR não extraiu texto")
-            return None
-
-        print(f"  OCR extraiu {len(results)} linhas")
-        return _parse(text)
-
     except Exception as e:
         print(f"  ⚠ Erro: {e}")
         return None

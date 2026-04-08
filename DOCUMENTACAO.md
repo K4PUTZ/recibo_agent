@@ -5,7 +5,7 @@
 ## Estado atual e pendências
 
 ### O que está funcionando (abril 2026)
-- ✅ OCR via EasyOCR (imagens JPEG/PNG/WEBP + PDFs via PyMuPDF)
+✅ OCR via EasyOCR (imagens JPEG/PNG/WEBP, PDFs via PyMuPDF, e recibos .docx via python-docx)
 - ✅ Match de aluno: PAGADORES_MAP + fuzzy por tokens com normalização de acentos
 - ✅ Detecção de conta recebedora: `tblContas` no Excel (aba CURSOS, J1:N6) com `load_contas()`
 - ✅ Inserção na `tblPagamentos` via Microsoft Graph API
@@ -33,6 +33,13 @@
 - `load_contas()` adicionado a `graph_client.py`, chamado no startup de `run.py`
 - `CONTAS` e `CONTA_PISTAS` em `config.py` agora são listas vazias preenchidas em runtime
 - Aba RELATORIOS reescrita com fórmulas dinâmicas em 5 seções
+
+Suporte a recibos .docx adicionado em abril/2026:
+      - Recibos .docx agora são lidos automaticamente (python-docx).
+      - O texto é extraído e campos principais (valor, data, conta) são detectados se possível.
+      - O pagamento é registrado como "OK (DOCX)" e o texto extraído vai para Observações.
+      - Se não for possível extrair valor/data, o campo fica em branco para conferência manual.
+      - Dependência: python-docx (adicionada ao requirements.txt).
 
 ---
 
@@ -80,18 +87,19 @@ Recibo cai na pasta "RECIBOS IN"
    watchdog detecta
          │
          ▼
-   processor.py
-   ┌─────────────────────────────┐
-   │ 1. Converte PDF → imagem    │  (se necessário, via PyMuPDF)
-   │ 2. EasyOCR lê a imagem      │  (~3 segundos, CPU)
-   │ 3. Regex extrai:            │
-   │    - Valor (R$ XXX,XX)      │
-   │    - Data (DD/MM/AAAA)      │
-   │    - Nome do pagador        │
-   │    - Método (PIX/TED/etc.)  │
-   │    - Conta recebedora       │
-   │ 4. Matching com tabela ALUNOS│
-   └─────────────────────────────┘
+      processor.py
+      ┌─────────────────────────────┐
+      │ 1. Converte PDF → imagem    │  (se necessário, via PyMuPDF)
+      │ 2. EasyOCR lê a imagem      │  (~3 segundos, CPU)
+      │ 3. Lê .docx (se aplicável)  │  (python-docx)
+      │ 4. Regex extrai:            │
+      │    - Valor (R$ XXX,XX)      │
+      │    - Data (DD/MM/AAAA)      │
+      │    - Nome do pagador        │
+      │    - Método (PIX/TED/etc.)  │
+      │    - Conta recebedora       │
+      │ 5. Matching com tabela ALUNOS│
+      └─────────────────────────────┘
          │
          ▼
    graph_client.py
@@ -135,12 +143,18 @@ Arquivo central que define todos os parâmetros do sistema. É o único arquivo 
 **Leitura do arquivo:**
 - Imagens (`.jpg`, `.jpeg`, `.png`, `.webp`): passadas direto para o OCR
 - PDFs (`.pdf`): primeira página convertida para PNG via PyMuPDF (200 DPI) antes do OCR
+- DOCX (`.docx`): texto extraído via python-docx; campos principais detectados por regex.
 
 **OCR com EasyOCR:**
 - Modelo rodando localmente, 100% offline, sem custo
 - Treinado para português + inglês (`["pt", "en"]`)
 - CPU-only — não precisa de placa de vídeo
 - Primeira execução carrega o modelo (~10s); nas seguintes fica em memória
+
+**Leitura de DOCX:**
+- Utiliza python-docx para extrair texto de recibos .docx.
+- Tenta identificar valor, data e conta automaticamente.
+- Se não for possível identificar, o campo fica em branco e o texto vai para Observações.
 
 **Extração de campos via regex:**
 
@@ -372,6 +386,12 @@ launchctl load ~/Library/LaunchAgents/com.mami.recibo_agent.plist
 **PDF com múltiplas páginas**
 - Apenas a primeira página é processada (que é onde fica o comprovante na maioria dos casos)
 
+**Recibos .docx**
+- O texto é extraído e os campos principais são detectados se possível.
+- O pagamento é registrado como "OK (DOCX)" e o texto extraído vai para Observações.
+- Se não for possível extrair valor/data, o campo fica em branco para conferência manual.
+- Recibos .docx com layout não convencional podem exigir ajuste manual na planilha.
+
 **Arquivo ilegível ou corrompido**
 - O sistema registra o erro no log, não faz nada com a planilha, e o arquivo permanece na pasta de entrada para reprocessamento manual
 
@@ -390,9 +410,12 @@ msal         # Autenticação Microsoft
 requests     # Chamadas à Graph API
 watchdog     # Monitoramento de pasta em tempo real
 certifi      # Certificados SSL para macOS/venv
+python-docx  # Leitura de recibos .docx
 ```
 
 Instalar: `pip install -r requirements.txt`
+
+**Nota:** O suporte a .docx requer python-docx instalado (já incluso no requirements.txt a partir de abril/2026).
 
 ---
 
