@@ -1,0 +1,6 @@
+easyocr
+watchdog
+pymupdf
+msal
+requests
+certifi

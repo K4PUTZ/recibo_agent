@@ -1,0 +1,15 @@
+# Token de autenticação Microsoft — nunca commitar
+.token_cache.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# macOS
+.DS_Store
