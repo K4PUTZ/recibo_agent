@@ -75,6 +75,9 @@ def process_receipt(file_path: Path) -> dict | None:
             reader = _get_reader()
             results = reader.readtext(str(image_path), detail=0)
             text = "\n".join(results)
+            print("\n===== TEXTO OCR COMPLETO =====")
+            print(text)
+            print("===== FIM TEXTO OCR =====\n")
             if not text.strip():
                 print("  ⚠ OCR não extraiu texto")
                 return None
@@ -86,6 +89,9 @@ def process_receipt(file_path: Path) -> dict | None:
             reader = _get_reader()
             results = reader.readtext(str(image_path), detail=0)
             text = "\n".join(results)
+            print("\n===== TEXTO OCR COMPLETO =====")
+            print(text)
+            print("===== FIM TEXTO OCR =====\n")
             if not text.strip():
                 print("  ⚠ OCR não extraiu texto")
                 return None
@@ -130,12 +136,14 @@ def _parse(text: str) -> dict:
     valor = _extract_valor(text)
     data = _extract_data(text)
     pagador = _extract_pagador(lines)
+    print(f"[DEBUG] Nome do pagador extraído: {pagador}")
     destinatario = _extract_destinatario(lines)
     conta = _extract_conta(text, destinatario)
     metodo = _extract_metodo(text)
     tx_id = _extract_tx_id(text)
     competencia = MESES[data.month - 1] if data else None
     aluno = _match_aluno(pagador) if pagador else None
+    print(f"[DEBUG] Matching aluno: {aluno}")
 
     obs_parts = []
     if metodo:
@@ -144,6 +152,8 @@ def _parse(text: str) -> dict:
         obs_parts.append(f"TX:{tx_id}")
     if pagador and not aluno:
         obs_parts.append(f"Pagador não encontrado nos alunos: {pagador}")
+    if not pagador:
+        obs_parts.append("Pagador não identificado no comprovante")
 
     campos_faltando = []
     if not valor:
@@ -156,7 +166,7 @@ def _parse(text: str) -> dict:
     # Recibo fica Pendente se não identificou o aluno ou faltou campo essencial
     recibo = "OK" if (aluno and valor and data) else "Pendente"
 
-    return {
+    dados = {
         "AlunoBeneficiario": aluno or "",
         "DataPagamento": data.strftime("%Y-%m-%d") if data else None,
         "VALOR": valor,
@@ -168,6 +178,10 @@ def _parse(text: str) -> dict:
         "ObservacoesPagamento": ", ".join(obs_parts),
         "_tx_id": tx_id,  # não é coluna da tabela — usado para deduplicação
     }
+    print("[DEBUG] Dados coletados:")
+    for k, v in dados.items():
+        print(f"  {k}: {v}")
+    return dados
 
 
 def _extract_valor(text: str) -> float | None:
@@ -232,6 +246,7 @@ _SKIP_LINE = re.compile(
 
 
 def _extract_pagador(lines: list[str]) -> str | None:
+    # 1. Busca tradicional por rótulos
     for i, line in enumerate(lines):
         if _PAGADOR_LABELS.match(line.strip()):
             for j in range(i + 1, min(i + 4, len(lines))):
@@ -240,6 +255,27 @@ def _extract_pagador(lines: list[str]) -> str | None:
                         and not re.match(r"^[\d\s.\-*/]+$", c)
                         and not _SKIP_LINE.search(c)):
                     return c
+
+
+    # 2. Busca após "Complemento" (qualquer caixa)
+    for i, line in enumerate(lines):
+        if "complemento" in line.lower():
+            for j in range(i + 1, min(i + 3, len(lines))):
+                c = lines[j].strip()
+                # Nome com 2+ palavras, não é número
+                if (len(c.split()) >= 2
+                        and not re.match(r"^[\d\s.\-*/]+$", c)):
+                    if c.strip().lower() not in {"flávia", "mateus", "silvia"}:
+                        return c.title()
+
+    # 3. Busca por linha "suspeita" no final do comprovante (qualquer caixa)
+    for c in reversed(lines):
+        c = c.strip()
+        if (len(c.split()) >= 2
+                and not re.match(r"^[\d\s.\-*/]+$", c)):
+            if c.strip().lower() not in {"flávia", "mateus", "silvia"}:
+                return c.title()
+
     return None
 
 

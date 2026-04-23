@@ -43,7 +43,6 @@ Suporte a recibos .docx adicionado em abril/2026:
 
 ---
 
-## O que é
 
 O **Recibo Agent** é um sistema Python que automatiza o processamento de comprovantes de pagamento (recibos) recebidos no WhatsApp ou por qualquer outro meio. Quando um arquivo é colocado em uma pasta específica, o sistema:
 
@@ -72,8 +71,27 @@ recibo_agent/
 ├── requirements.txt     # Dependências Python
 ├── .token_cache.json    # Token de autenticação (gerado automaticamente, não commitar)
 ├── instalar_mac.sh      # Instalador macOS
-├── instalar_windows.bat # Instalador Windows (desatualizado — ainda referencia Ollama)
-└── DOCUMENTACAO.md      # Este arquivo
+---
+
+## Execução via Serviço/Atalho (macOS)
+
+O Recibo Agent pode ser executado facilmente por um serviço/atalho do macOS, que abre o Terminal já com o ambiente Python correto. Exemplo de AppleScript para o serviço:
+
+```applescript
+on run {input, parameters}
+      set pythonPath to "/Volumes/Expansion/----- MAMI -----/.venv/bin/python"
+      set scriptPath to "/Volumes/Expansion/----- MAMI -----/recibo_agent/run.py"
+      set command to """" & pythonPath & """ " & scriptPath & " --once; read -n 1 -s -r -p 'Pressione qualquer tecla para fechar...'"
+      tell application "Terminal"
+            activate
+            do script command
+      end tell
+      return input
+end run
+```
+
+Esse método garante que o script rode sempre com o ambiente correto, sem necessidade de ativar o venv manualmente. Basta acionar o serviço/atalho para processar os recibos.
+---
 ```
 
 ---
