@@ -40,13 +40,13 @@ TRAY_AVAILABLE = False
 
 
 # Elementos visuais para terminal
-def linha(tam=60, char="─"):
+def linha(tam=20, char="─"):
     print(char * tam)
 
-def titulo(txt, tam=60, char="═"):
+def titulo(txt, tam=20, char="═"):
     print()
     print(char * tam)
-    print(f"{txt:^{tam}}")
+    print(f"{txt:^{tam}} 🧾")
     print(char * tam)
 
 def paragrafo(txt=""):
@@ -65,20 +65,20 @@ def main():
     titulo("RECIBO AGENT")
 
     # Carrega contas de recebimento da tblContas
-    paragrafo("Carregando contas do Excel Online...")
+    paragrafo("💳 Carregando contas do Excel Online...")
     try:
         load_contas()
         print("  ✅ Contas carregadas com sucesso.")
     except Exception as e:
-        print(f"  ⚠ Não foi possível carregar contas: {e}")
+        print(f"  ⚠️ Não foi possível carregar contas: {e}")
 
     # Carrega alunos conhecidos para matching (via Graph API)
-    paragrafo("Carregando alunos do Excel Online...")
+    paragrafo("👩‍🎓 Carregando alunos do Excel Online...")
     try:
         load_alunos()
         print("  ✅ Alunos carregados com sucesso.")
     except Exception as e:
-        print(f"  ⚠ Não foi possível carregar alunos: {e}")
+        print(f"  ⚠️ Não foi possível carregar alunos: {e}")
         print("  Continuando sem lista de alunos (matching desativado)")
 
     linha()
@@ -93,19 +93,19 @@ def main():
 
     def process_file(f, dry_run=False):
         paragrafo()
-        linha()
-        print(f"Processando arquivo: {f.name}")
-        linha()
+        print("🔹🔹🔹")
+        print(f"⏳ Processando arquivo: {f.name}")
+        print("────────────")
         try:
             data = process_receipt(f)
             if not data:
-                print(f"✗ Não foi possível extrair dados de {f.name}")
-                linha()
+                print(f"❌ Não foi possível extrair dados de {f.name}")
+                print("────────────")
                 return False
-            print(f"Dados extraídos:\n  {data}")
+            print(f"📝 Dados extraídos:\n  {data}")
             if dry_run:
                 print("  [DRY RUN] Nenhuma alteração feita.")
-                linha()
+                print("────────────")
                 return True
             pay_id = insert_payment(data)
             print(f"  ✅ Inserido como {pay_id}")
@@ -114,18 +114,18 @@ def main():
             dest_name = f"{pay_id}{f.suffix.lower()}"
             shutil.move(str(f), str(PROCESSED_FOLDER / dest_name))
             print(f"  📦 Movido para ARQUIVOS PROCESSADOS: {dest_name}")
-            linha()
+            print("────────────")
             return True
         except DuplicateReceiptError:
-            print(f"⚠ Duplicado: {f.name}")
+            print(f"⚠️ Duplicado: {f.name}")
             dest_name = f"DUP-{f.name}"
             shutil.move(str(f), str(PROCESSED_FOLDER / dest_name))
             print(f"  📦 Movido para ARQUIVOS PROCESSADOS: {dest_name}")
-            linha()
+            print("────────────")
             return True
         except Exception as e:
-            print(f"✗ Erro em {f.name}: {e}")
-            linha()
+            print(f"❌ Erro em {f.name}: {e}")
+            print("────────────")
             return False
 
     if args.file:
@@ -139,18 +139,17 @@ def main():
     elif args.once:
         files = [f for f in WATCH_FOLDER.iterdir() if f.is_file() and f.suffix.lower() in SUPPORTED]
         if not files:
-            paragrafo("Nenhum recibo pendente.")
-            linha()
+            paragrafo("📭 Nenhum recibo pendente.")
+            print("────────────")
             return
-        paragrafo(f"Processando {len(files)} recibo(s)...")
-        linha()
+        paragrafo(f"📑 Processando {len(files)} recibo(s)...")
+        print("────────────")
         with tqdm(total=len(files), desc="Processando recibos", unit="recibo") as pbar:
             for f in files:
                 process_file(f, args.dry_run)
                 pbar.update(1)
-        linha()
-        print("Processamento concluído.")
-        linha()
+        print("🏁 Processamento concluído!")
+        print("────────────")
     else:
         files = [f for f in WATCH_FOLDER.iterdir() if f.is_file() and f.suffix.lower() in SUPPORTED]
         if not files:

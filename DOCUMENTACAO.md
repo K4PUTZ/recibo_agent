@@ -5,20 +5,26 @@
 ## Estado atual e pendências
 
 ### O que está funcionando (abril 2026)
-✅ OCR via EasyOCR (imagens JPEG/PNG/WEBP, PDFs via PyMuPDF, e recibos .docx via python-docx)
-- ✅ Match de aluno: PAGADORES_MAP + fuzzy por tokens com normalização de acentos
-- ✅ Detecção de conta recebedora: `tblContas` no Excel (aba CURSOS, J1:N6) com `load_contas()`
-- ✅ Inserção na `tblPagamentos` via Microsoft Graph API
-- ✅ Upload do recibo para OneDrive `/RECIBOS/{PAY-ID}.ext`
-- ✅ Arquivo movido para `RECIBOS PROCESSADOS` após processamento (duplicatas com prefixo `DUP-`)
-- ✅ Deduplicação por ID de transação PIX (campo `TX:E6xxx...` em ObservacoesPagamento)
-- ✅ LaunchAgent macOS (autostart no login, Nice 10, KeepAlive)
-- ✅ Aba RELATORIOS com 5 seções de fórmulas dinâmicas (ver abaixo)
+
+✅ OCR 100% Python puro: EasyOCR (JPEG/PNG/WEBP), PyMuPDF (PDF), python-docx (DOCX)
+✅ Não depende de Ollama/LLM: toda a extração de dados é feita com regex e lógica Python
+✅ Cobre todos os tipos de recibo históricos: jpg, jpeg, png, pdf, docx
+✅ Match de aluno: PAGADORES_MAP + fuzzy por tokens com normalização de acentos
+✅ Detecção de conta recebedora: `tblContas` no Excel (aba CURSOS, J1:N6) com `load_contas()`
+✅ Inserção na `tblPagamentos` via Microsoft Graph API
+✅ Upload do recibo para OneDrive `/RECIBOS/{PAY-ID}.ext`
+✅ Arquivo movido para `RECIBOS PROCESSADOS` após processamento (duplicatas com prefixo `DUP-`)
+✅ Deduplicação por ID de transação PIX (campo `TX:E6xxx...` em ObservacoesPagamento)
+✅ LaunchAgent macOS (autostart no login, Nice 10, KeepAlive)
+✅ Aba RELATORIOS com 5 seções de fórmulas dinâmicas (ver abaixo)
 
 ### Pendências conhecidas
-- ❌ `instalar_windows.bat` ainda referencia Ollama (engine antiga) — não foi atualizado para EasyOCR
 - ❌ Aba RELATORIOS S2 (Realizado por Curso) pode ainda mostrar `#VALUE!` em alguns ambientes Excel Online — a fórmula usa `LET + FILTER + ISNUMBER(MATCH)` que requer Excel 365
 - ⚠ 7 PAY IDs sem comprovante (marcados `Pendente`): PAY-000000022, 029, 056, 126, 130, 131, 142
+
+### Observação
+O sistema está pronto para empacotamento como app auto-contido, sem dependências externas além do Python e bibliotecas listadas no requirements.txt.
+Se surgir um novo tipo de recibo, basta ajustar o parser, mas para o acervo atual e fluxo esperado, está tudo coberto.
 
 ### Últimas alterações relevantes (abril 2026)
 - `audit_historico.py` adicionado: faz upload e renomeia os 147 recibos históricos (nomes numéricos → PAY-ID)
@@ -461,13 +467,17 @@ Gerenciada direto no Excel. O sistema lê em cada startup via `load_contas()`.
 |---|---|---|---|---|
 | Mateus | Mateus de Oliveira e Souza Ribeiro | `30460639897, mateus de oliveira` | CPF | SIM |
 | Silvia | Silvia Maciel Resende | `64800695000179, silvia maciel, 64.800.695` | CNPJ | SIM |
-| Flávia | Flávia Betti de Oliveira e Souza | `59164158934, 591641589, flavia betti, flavia betti de o` | CPF | SIM |
+| Flávia | Flávia Betti de Oliveira e Souza | `CPF` | CPF | NAO |
 | CNPJ | Flávia Betti (CNPJ) | `45236939000198, 45.236.939/0001-98, flavia betti cnpj` | CNPJ | SIM |
 | Paypal | Flávia Betti de Oliveira e Souza | `paypal, flavia betti paypal, FLÁVIA BETTI` | Paypal | SIM |
 
-**Como funciona a detecção de conta:** o texto completo do recibo + nome do destinatário são varridos contra todas as chaves de `CONTA_PISTAS`. A primeira correspondência define `ContaRecebimento`.
 
-**Para adicionar/modificar contas:** editar diretamente as células J1:N6 no Excel. Na próxima execução o sistema carrega automaticamente.
+**Como funciona a detecção de conta:**
+- Se o texto do recibo mencionar "paypal" (qualquer caixa), a conta é registrada como **Paypal** (tem prioridade sobre qualquer outro critério).
+- Se houver qualquer pista de Flávia Betti (CPF, CNPJ, nome), a conta é registrada como **CNPJ** (mesmo que o recibo traga o CPF dela), exceto se for PayPal.
+- Caso contrário, o texto completo do recibo + nome do destinatário são varridos contra todas as chaves de `CONTA_PISTAS`. A primeira correspondência define `ContaRecebimento`.
+
+**Para adicionar/modificar contas:** editar diretamente as células J1:N6 no Excel. Na próxima execução o sistema carrega automaticamente. Para desativar uma conta, marque "NÃO" na coluna Ativo.
 
 ### tblPagamentos (PAGAMENTOS) — 11 colunas
 

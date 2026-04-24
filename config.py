@@ -14,13 +14,9 @@ IS_WIN = platform.system() == "Windows"
 APP_DIR = Path(__file__).parent
 
 # ── Caminhos locais ──
-if IS_MAC:
-    WATCH_FOLDER = Path("/Volumes/Expansion/----- MAMI -----/RECIBOS IN")
-    PROCESSED_FOLDER = Path("/Volumes/Expansion/----- MAMI -----/RECIBOS PROCESSADOS")
-else:
-    # Windows — pasta OneDrive da mãe
-    WATCH_FOLDER = Path.home() / "OneDrive" / "MAMI" / "RECIBOS IN"
-    PROCESSED_FOLDER = Path.home() / "OneDrive" / "MAMI" / "RECIBOS PROCESSADOS"
+ONEDRIVE_ROOT = Path.home() / "OneDrive"
+WATCH_FOLDER = ONEDRIVE_ROOT / "MAMI" / "RECIBOS IN"
+PROCESSED_FOLDER = ONEDRIVE_ROOT / "MAMI" / "RECIBOS PROCESSADOS"
 
 # ── Pasta no OneDrive onde os recibos processados são salvos ──
 # "RECIBOS" = Meus Arquivos/RECIBOS/ na raiz do OneDrive
