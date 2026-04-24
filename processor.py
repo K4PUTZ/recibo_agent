@@ -283,6 +283,14 @@ def _extract_conta(text: str, destinatario: str | None = None) -> str:
     t = text.lower()
     dest = (destinatario or "").lower()
 
+    # Força qualquer pista de CPF da Flávia como CNPJ
+    # CPF da Flávia: 59164158934, 591641589, flavia betti, flavia betti de o
+    pistas_flavia_cpf = [
+        "59164158934", "591641589", "flavia betti", "flávia betti", "flavia betti de o", "flávia betti de o"
+    ]
+    if any(p in t or p in dest for p in pistas_flavia_cpf):
+        return "CNPJ"
+
     if "paypal" in t:
         return "Paypal"
     if re.search(r"\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}", text):
