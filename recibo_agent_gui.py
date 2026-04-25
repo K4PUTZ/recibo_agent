@@ -1,9 +1,14 @@
 """
-Recibo Agent - Interface Gráfica (Tkinter)
-Inspirado no DRIVE NAVIGATOR
+Recibo Agent GUI — Interface gráfica para processamento 100% na nuvem (OneDrive).
+
+Permite autenticação, configuração da pasta remota, listagem e processamento de recibos diretamente do OneDrive.
+Não há dependência de pastas locais. Todo o fluxo é cloud-only.
+
+Inspirado no DRIVE NAVIGATOR.
 """
 
 import os
+import json
 import sys
 import platform
 import subprocess
@@ -125,24 +130,48 @@ class ReciboAgentGUI(tk.Tk):
         y = (hs // 3) - (h // 2)
         self.geometry(f"+{x}+{y}")
 
+
     def create_widgets(self):
+        import os
         frame = tk.Frame(self, padx=20, pady=20, bg="#222")
         frame.pack(fill=tk.BOTH, expand=True)
 
-        # Título (alinhado à esquerda)
-        title = tk.Label(frame, text=f"MATT MAGIC RECIBO_AGENT™ 1.0", font=("Arial", 16, "bold"), bg="#222", fg="#7CFC00", anchor="w", justify=tk.LEFT)
+        # Título
+        title = tk.Label(frame, text=f"MATT MAGIC RECIBO_AGENT™ 1.0", font=("Consolas", 16, "bold"), bg="#222", fg="#7CFC00", anchor="w", justify=tk.LEFT)
         title.pack(pady=(0, 0), anchor="w", padx=(36,0))
-        subsubtitle = tk.Label(frame, text="=================================================", font=("Arial", 10), bg="#222", fg="#CCCCCC", anchor="w", justify=tk.LEFT)
+        subsubtitle = tk.Label(frame, text="=================================================", font=("Consolas", 10), bg="#222", fg="#CCCCCC", anchor="w", justify=tk.LEFT)
         subsubtitle.pack(pady=(0, 8), anchor="w", padx=(36,0))
-        subtitle = tk.Label(frame, text="by Mateus Ribeiro   |   emaildomat@gmail.com", font=("Arial", 10), bg="#222", fg="#CCCCCC", anchor="w", justify=tk.LEFT)
+        subtitle = tk.Label(frame, text="by Mateus Ribeiro   |   emaildomat@gmail.com", font=("Consolas", 10), bg="#222", fg="#CCCCCC", anchor="w", justify=tk.LEFT)
         subtitle.pack(pady=(0, 8), anchor="w", padx=(36,0))
 
-        # Instruções (alinhadas à esquerda)
+        # Linha de status (conexão e config)
+        status_frame = tk.Frame(frame, bg="#222")
+        status_frame.pack(pady=(0, 10), anchor="w", padx=(36,0), fill=tk.X)
+
+        # Status bolinha
+        self.status_canvas = tk.Canvas(status_frame, width=18, height=18, bg="#222", highlightthickness=0)
+        self.status_canvas.pack(side=tk.LEFT, padx=(0, 6))
+
+        # Botão conectar/desconectar
+        self.connect_btn = tk.Button(status_frame, text="...", font=("Consolas", 11), command=self.on_connect_btn, width=12)
+        self.connect_btn.pack(side=tk.LEFT, padx=(0, 12))
+
+        # Botão configurar pasta remota
+        config_btn = tk.Button(status_frame, text="Configurar Pasta Remota", font=("Consolas", 11), command=self.on_configure_folder)
+        config_btn.pack(side=tk.LEFT)
+
+        # Label do caminho atual
+        from graph_client import ONEDRIVE_RECIBOS_IN_SLUG
+        self.folder_label = tk.Label(status_frame, text=f"Pasta remota: {ONEDRIVE_RECIBOS_IN_SLUG}", font=("Consolas", 10), bg="#222", fg="#00BCD4", anchor="w")
+        self.folder_label.pack(side=tk.LEFT, padx=(16,0))
+
+        # Instruções
         instr = (
-            "Antes de rodar o programa, verifique se a pasta RECIBOS IN existe no OneDrive.\n"
-            "Adicione -c /CAMINHO/RECIBOS IN na linha de comando para configurar a pasta padrão de armazenamento.\n"
-            "Adicione -r na linha de comando para fazer login no drive remoto.\n"
-            f"Pasta atual: Meus Arquivos/RECIBOS/RECIBOS_IN\n"
+            "Processamento 100% na nuvem.\n"
+            "1. Clique em 'Conectar' para autenticar com sua conta Microsoft.\n"
+            "2. Configure a pasta remota conforme sua estrutura no OneDrive.\n"
+            "3. Clique em 'Processar Recibos' para iniciar o processamento.\n"
+            "\nTodos os arquivos são processados, enviados para a pasta de processados e removidos do OneDrive automaticamente."
         )
         instr_label = tk.Label(frame, text=instr, font=("Consolas", 10), bg="#222", fg="#00BCD4", justify=tk.LEFT, anchor="w")
         instr_label.pack(pady=(0, 10), anchor="w", padx=(36,0))
@@ -151,26 +180,126 @@ class ReciboAgentGUI(tk.Tk):
         self.log_area.pack(pady=10)
         self.log_area.config(state=tk.DISABLED)
 
-        btn = tk.Button(frame, text="Processar Recibos", font=("Arial", 14), command=self.on_processar)
+        btn = tk.Button(frame, text="Processar Recibos", font=("Consolas", 14), command=self.on_processar)
         btn.pack(pady=10)
 
+        self.update_connect_status()
+
+    def update_connect_status(self):
+        # Verifica se há conta válida no cache do MSAL
+        from config import TOKEN_CACHE_PATH, CLIENT_ID, AUTHORITY
+        import msal
+        token_ok = False
+        if TOKEN_CACHE_PATH.exists():
+            try:
+                cache = msal.SerializableTokenCache()
+                cache.deserialize(TOKEN_CACHE_PATH.read_text())
+                app = msal.PublicClientApplication(
+                    CLIENT_ID,
+                    authority=AUTHORITY,
+                    token_cache=cache,
+                )
+                accounts = app.get_accounts()
+                if accounts:
+                    # Tenta obter token silencioso
+                    from config import SCOPES
+                    result = app.acquire_token_silent(SCOPES, account=accounts[0])
+                    if result and "access_token" in result:
+                        token_ok = True
+            except Exception:
+                token_ok = False
+        # Atualiza bolinha
+        self.status_canvas.delete("all")
+        color = "#00FF00" if token_ok else "#FF3333"
+        self.status_canvas.create_oval(3, 3, 15, 15, fill=color, outline=color)
+        # Atualiza texto do botão
+        if token_ok:
+            self.connect_btn.config(text="Desconectar")
+        else:
+            self.connect_btn.config(text="Conectar")
+        self.token_ok = token_ok
+
+    def on_connect_btn(self):
+        if getattr(self, "token_ok", False):
+            # Confirmar antes de desconectar
+            from tkinter import messagebox
+            if messagebox.askyesno("Desconectar", "Deseja realmente desconectar esta conta?"):
+                from config import TOKEN_CACHE_PATH
+                try:
+                    TOKEN_CACHE_PATH.unlink()
+                except Exception:
+                    pass
+                self.log("[INFO] Conta desconectada.\n")
+                self.update_connect_status()
+        else:
+            # Forçar login
+            self.log("[INFO] Iniciando autenticação...\n")
+            try:
+                from auth import get_token
+                get_token()
+                self.log("[OK] Autenticação realizada com sucesso.\n")
+            except Exception as e:
+                self.log(f"[ERRO] Falha na autenticação: {e}\n")
+            # Pequeno delay para garantir escrita do cache
+            self.after(300, self.update_connect_status)
+
+    def on_configure_folder(self):
+        # Abre um input para editar o slug da pasta remota
+        from tkinter import simpledialog, messagebox
+        import importlib
+        import sys
+        # Carrega valor atual
+        from graph_client import ONEDRIVE_RECIBOS_IN_SLUG
+        current = ONEDRIVE_RECIBOS_IN_SLUG
+        new_slug = simpledialog.askstring("Configurar Pasta Remota", "Digite o caminho da pasta remota (ex: RECIBOS/RECIBOS_IN):", initialvalue=current)
+        if new_slug and new_slug != current:
+            # Atualiza no arquivo config.py
+            try:
+                config_path = os.path.join(os.path.dirname(__file__), "graph_client.py")
+                with open(config_path, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+                with open(config_path, "w", encoding="utf-8") as f:
+                    for line in lines:
+                        if line.strip().startswith("ONEDRIVE_RECIBOS_IN_SLUG"):
+                            f.write(f'ONEDRIVE_RECIBOS_IN_SLUG = "{new_slug}"\n')
+                        else:
+                            f.write(line)
+                # Reload do módulo
+                importlib.reload(sys.modules["graph_client"])
+                self.folder_label.config(text=f"Pasta remota: {new_slug}")
+                self.log(f"[OK] Caminho remoto atualizado para: {new_slug}\n")
+            except Exception as e:
+                messagebox.showerror("Erro", f"Falha ao atualizar caminho remoto: {e}")
+                self.log(f"[ERRO] Falha ao atualizar caminho remoto: {e}\n")
     def focus_log(self):
         self.log_area.focus_set()
 
     def checkup_sistema(self):
-        self.log("[CHECKUP] Verificando ambiente...\n")
-        # Verifica pasta IN
-        from config import WATCH_FOLDER
-        if not os.path.exists(WATCH_FOLDER):
-            self.log(f"[ERRO] Pasta de entrada não encontrada: {WATCH_FOLDER}\n")
-        else:
-            self.log(f"[OK] Pasta de entrada encontrada: {WATCH_FOLDER}\n")
+        self.log("[CHECKUP] Verificando ambiente na nuvem...\n")
+        # Exibe o slug da pasta remota
+        try:
+            from graph_client import ONEDRIVE_RECIBOS_IN_SLUG
+            self.log(f"[OK] Pasta de entrada remota: {ONEDRIVE_RECIBOS_IN_SLUG}\n")
+        except Exception:
+            self.log("[ERRO] Não foi possível obter o slug da pasta remota.\n")
         # Verifica conexão API (tentativa simples de autenticação)
         try:
             from auth import get_token
             token = get_token()
             if token:
                 self.log("[OK] Conexão com a API Microsoft Graph estabelecida.\n")
+                # Listar arquivos remotos após checkup
+                self.log("------\nArquivos na pasta remota:\n")
+                try:
+                    from graph_client import list_onedrive_files
+                    files = list_onedrive_files()
+                    if files:
+                        for f in files:
+                            self.log(f"- {f['name']} ({f['size']} bytes)\n")
+                    else:
+                        self.log("(Nenhum arquivo encontrado)\n")
+                except Exception as e:
+                    self.log(f"[ERRO] Falha ao listar arquivos remotos: {e}\n")
             else:
                 self.log("[ERRO] Não foi possível obter token de autenticação.\n")
         except Exception as e:

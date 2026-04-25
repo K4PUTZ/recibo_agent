@@ -1,6 +1,88 @@
+def delete_onedrive_file(file_id):
+    """
+    Remove um arquivo do OneDrive pelo ID.
+    
+    Args:
+        file_id (str): ID do arquivo no OneDrive.
+    Returns:
+        bool: True se removido com sucesso.
+    Raises:
+        RuntimeError: Se a exclusão falhar.
+    """
+    url = f"{GRAPH}/me/drive/items/{file_id}"
+    r = requests.delete(url, headers=_headers())
+    if r.status_code not in (204, 200):
+        raise RuntimeError(f"Falha ao remover arquivo: {r.status_code} {r.text}")
+    return True
+# --- Funções para manipulação de arquivos no OneDrive (RECIBOS_IN e RECIBOS) ---
+
+# Slugs configuráveis para as pastas remotas
+ONEDRIVE_RECIBOS_IN_SLUG = "RECIBOS/RECIBOS_IN"
+ONEDRIVE_RECIBOS_PROCESSED_SLUG = "RECIBOS"
+
+def list_onedrive_files(folder_slug=ONEDRIVE_RECIBOS_IN_SLUG):
+    """
+    Lista arquivos na pasta remota do OneDrive (slug).
+    
+    Args:
+        folder_slug (str): Caminho da pasta remota.
+    Returns:
+        list: Lista de dicts com name, id e size.
+    """
+    import urllib.parse
+    url = f"{GRAPH}/me/drive/root:/{urllib.parse.quote(folder_slug)}:/children?$select=name,id,size"
+    r = requests.get(url, headers=_headers())
+    r.raise_for_status()
+    return r.json().get("value", [])
+
+def download_onedrive_file(file_id, local_path):
+    """
+    Baixa um arquivo do OneDrive pelo ID para o caminho local especificado.
+    
+    Args:
+        file_id (str): ID do arquivo no OneDrive.
+        local_path (str): Caminho local de destino.
+    Returns:
+        str: Caminho local salvo.
+    """
+    url = f"{GRAPH}/me/drive/items/{file_id}/content"
+    r = requests.get(url, headers=_headers(), stream=True)
+    r.raise_for_status()
+    with open(local_path, "wb") as f:
+        for chunk in r.iter_content(chunk_size=8192):
+            f.write(chunk)
+    return local_path
+
+def move_onedrive_file(file_id, dest_folder_slug=ONEDRIVE_RECIBOS_PROCESSED_SLUG):
+    """
+    Move um arquivo do OneDrive para outra pasta (slug).
+    
+    Args:
+        file_id (str): ID do arquivo no OneDrive.
+        dest_folder_slug (str): Caminho da pasta de destino.
+    Returns:
+        dict: Resposta da API do OneDrive.
+    """
+    import urllib.parse
+    url = f"{GRAPH}/me/drive/items/{file_id}"
+    body = {
+        "parentReference": {
+            "path": f"/drive/root:/{dest_folder_slug}"
+        }
+    }
+    r = requests.patch(url, headers=_headers(), json=body)
+    r.raise_for_status()
+    return r.json()
 """
-Cliente Microsoft Graph API para operações no Excel Online.
-Escreve direto na tblPagamentos sem tocar no arquivo local —
+Cliente Microsoft Graph API para operações no Excel Online e manipulação de arquivos no OneDrive.
+
+Funções principais:
+- list_onedrive_files: lista arquivos em uma pasta remota.
+- download_onedrive_file: baixa arquivo remoto.
+- move_onedrive_file: move arquivo entre pastas.
+- delete_onedrive_file: remove arquivo remoto.
+
+Todas as operações são feitas via API Graph, sem dependência de arquivos locais.
 funciona mesmo com o Excel aberto no browser.
 """
 import re
