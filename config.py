@@ -29,6 +29,7 @@ CLIENT_ID = "c2618b42-a033-4db3-b193-31109c2fcb1b"
 AUTHORITY = "https://login.microsoftonline.com/consumers"  # Conta pessoal Microsoft
 SCOPES = ["Files.ReadWrite.All"]
 TOKEN_CACHE_PATH = APP_DIR / ".token_cache.json"
+GUI_PREFS_PATH = APP_DIR / ".gui_prefs.json"
 
 # ── Excel Online ──
 WORKBOOK_NAME = "GESTAO_CURSOS_2026.xlsx"

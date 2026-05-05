@@ -13,3 +13,14 @@ build/
 
 # macOS
 .DS_Store
+
+# GUI preferences — runtime file
+.gui_prefs.json
+
+# PyInstaller build artifacts
+APP/
+*.spec
+
+# Test files
+tkinter_test.py
+tkinter_test.spec

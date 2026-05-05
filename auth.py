@@ -82,6 +82,39 @@ def get_token() -> str:
     return result["access_token"]
 
 
+def check_token_silent() -> str | None:
+    """
+    Tenta obter um token usando apenas o cache local (silent refresh).
+    NUNCA dispara device code flow. Retorna access_token ou None.
+    Seguro para chamar no main thread da GUI.
+    """
+    if not TOKEN_CACHE_PATH.exists():
+        return None
+    try:
+        app = _get_app()
+        accounts = app.get_accounts()
+        if not accounts:
+            return None
+        result = app.acquire_token_silent(SCOPES, account=accounts[0])
+        if result and "access_token" in result:
+            _save_cache()
+            return result["access_token"]
+    except Exception:
+        pass
+    return None
+
+
+def disconnect():
+    """
+    Remove o cache de token local e reseta o singleton do app MSAL.
+    Após isso, qualquer chamada a get_token() vai requerer novo login.
+    """
+    global _app
+    if TOKEN_CACHE_PATH.exists():
+        TOKEN_CACHE_PATH.unlink()
+    _app = None
+
+
 def get_device_code_flow():
     """
     Inicia o device code flow e retorna dict com 'verification_uri' e 'user_code'.
